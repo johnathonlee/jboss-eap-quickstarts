@@ -16,9 +16,19 @@
  */
 package org.jboss.as.quickstarts.ejbTimer;
 
+import java.io.IOException;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
+import java.util.Iterator;
+import java.util.List;
+
 import javax.ejb.Schedule;
 import javax.ejb.Singleton;
 
+import org.jboss.as.controller.client.ModelControllerClient;
+import org.jboss.as.controller.client.OperationBuilder;
+import org.jboss.as.controller.client.helpers.ClientConstants;
+import org.jboss.dmr.ModelNode;
 
 /**
  * Demonstrates how to use the EJB's @Schedule.
@@ -27,10 +37,100 @@ import javax.ejb.Singleton;
  */
 @Singleton
 public class ScheduleExample {
-  
-    @Schedule(second="*/2", minute="*",hour="*", persistent=false)
-    public void doWork(){
-        System.out.println( "Hi from the EJB timer example!" );
-    }
-    
+	
+	ModelControllerClient client = null;
+
+	@Schedule(second = "*/5", minute = "*", hour = "*", persistent = false)
+	public void txCleanup() {
+		
+		txProbe();
+		
+		try {
+
+			ModelNode op = new ModelNode();
+			op.get("operation").set("read-resource");
+			
+			ModelNode addr = op.get("address");
+			addr.add("subsystem", "transactions");
+			addr.add("log-store", "log-store");
+			op.get("recursive").set(true);
+			System.out.println(op);
+			
+			//subsystem=transactions/log-store=log-store:read-resource(recursive=true)
+
+			
+			client = ModelControllerClient.Factory.create(
+					InetAddress.getByName("127.0.0.1"), 9999);
+			
+			System.out.println("client.execute start");
+			ModelNode response = client.execute(new OperationBuilder(op)
+					.build());
+			System.out.println("client.execute finished");
+			
+			System.out.println("RESULT: " + response.get(ClientConstants.RESULT).toString());
+			
+			List<ModelNode> lst = response.get(ClientConstants.RESULT).asList();
+			
+			Iterator it = lst.iterator();
+			
+			while(it.hasNext()){
+
+				op = (ModelNode) it.next();
+				op.get("operation").set("read-attribute");
+				op.get("name").set("age-in-seconds");
+				
+				//node.get("operation").set("read-resource");
+				//node.add("age-in-seconds");
+				
+				System.out.println("client.execute start");
+				response = client.execute(new OperationBuilder(op)
+						.build());
+				System.out.println("client.execute finished");
+				
+				System.out.println("RESULT in WHILE loop: " + response.get(ClientConstants.RESULT).toString());
+				
+				
+			}
+			
+		} catch (UnknownHostException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+}
+	
+	
+	//subsystem=transactions/log-store=log-store/:probe()
+	public void txProbe() {
+		System.out.println("txProbe");
+
+		try {
+
+			ModelNode op = new ModelNode();
+			op.get("operation").set("probe");
+			op.get("operations").set(true);
+			
+			ModelNode addr = op.get("address");
+			addr.add("subsystem", "transactions");
+			addr.add("log-store", "log-store");
+			
+			System.out.println("operation: " + op);
+			
+			client = ModelControllerClient.Factory.create(
+					InetAddress.getByName("127.0.0.1"), 9999);
+			
+			System.out.println("client.execute start");
+			ModelNode response = client.execute(op);
+			System.out.println("client.execute finished");
+			
+			System.out.println("RESULT: " + response.get(ClientConstants.RESULT).toString());
+			
+		} catch (UnknownHostException e1) {
+			e1.printStackTrace();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
 }
