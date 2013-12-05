@@ -37,72 +37,77 @@ import org.jboss.dmr.ModelNode;
  */
 @Singleton
 public class ScheduleExample {
-	
+
 	ModelControllerClient client = null;
 
 	@Schedule(second = "*/5", minute = "*", hour = "*", persistent = false)
-	public void txCleanup() {
-		
+	public void txCleanup() throws IOException {
+
 		txProbe();
-		
+
 		try {
 
 			ModelNode op = new ModelNode();
-			op.get("operation").set("read-resource");
-			
+			op.get("operation").set("read-children-resources");
+			op.get("child-type").set("transactions");
+			op.get("operations").set(true);
+
 			ModelNode addr = op.get("address");
 			addr.add("subsystem", "transactions");
 			addr.add("log-store", "log-store");
 			op.get("recursive").set(true);
 			System.out.println(op);
-			
-			//subsystem=transactions/log-store=log-store:read-resource(recursive=true)
 
-			
+			// subsystem=transactions/log-store=log-store:read-resource(recursive=true)
+
 			client = ModelControllerClient.Factory.create(
 					InetAddress.getByName("127.0.0.1"), 9999);
-			
+
 			System.out.println("client.execute start");
 			ModelNode response = client.execute(new OperationBuilder(op)
 					.build());
 			System.out.println("client.execute finished");
-			
-			System.out.println("RESULT: " + response.get(ClientConstants.RESULT).toString());
-			
+
+			System.out.println("RESULT: "
+					+ response.get(ClientConstants.RESULT).toString());
+
 			List<ModelNode> lst = response.get(ClientConstants.RESULT).asList();
-			
+
 			Iterator it = lst.iterator();
-			
-			while(it.hasNext()){
+
+			while (it.hasNext()) {
 
 				op = (ModelNode) it.next();
-				op.get("operation").set("read-attribute");
-				op.get("name").set("age-in-seconds");
-				
-				//node.get("operation").set("read-resource");
-				//node.add("age-in-seconds");
-				
-				System.out.println("client.execute start");
-				response = client.execute(new OperationBuilder(op)
-						.build());
-				System.out.println("client.execute finished");
-				
-				System.out.println("RESULT in WHILE loop: " + response.get(ClientConstants.RESULT).toString());
-				
-				
+				System.out.println("In Iterator: "
+						+ op.get(0).get("age-in-seconds"));
+
+				if (op.get(0).get("age-in-seconds").asInt() > 10000) {
+					ModelNode deleteOp = new ModelNode();
+					deleteOp.get("operation").set("delete");
+					deleteOp.get("operations").set(true);
+
+					ModelNode deleteAddr = deleteOp.get("address");
+					deleteAddr.add("subsystem", "transactions");
+					deleteAddr.add("log-store", "log-store");
+					deleteAddr.add("transactions", op.get(0).get("id"));
+					deleteOp.get("recursive").set(true);
+					System.out.println(deleteOp);
+					response = client.execute(new OperationBuilder(deleteOp)
+							.build());
+				}
+
+				client.close();
 			}
-			
+
 		} catch (UnknownHostException e1) {
-			// TODO Auto-generated catch block
 			e1.printStackTrace();
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
+			client.close();
 		}
-}
-	
-	
-	//subsystem=transactions/log-store=log-store/:probe()
+	}
+
+	// subsystem=transactions/log-store=log-store/:probe()
 	public void txProbe() {
 		System.out.println("txProbe");
 
@@ -111,22 +116,23 @@ public class ScheduleExample {
 			ModelNode op = new ModelNode();
 			op.get("operation").set("probe");
 			op.get("operations").set(true);
-			
+
 			ModelNode addr = op.get("address");
 			addr.add("subsystem", "transactions");
 			addr.add("log-store", "log-store");
-			
+
 			System.out.println("operation: " + op);
-			
+
 			client = ModelControllerClient.Factory.create(
 					InetAddress.getByName("127.0.0.1"), 9999);
-			
+
 			System.out.println("client.execute start");
 			ModelNode response = client.execute(op);
 			System.out.println("client.execute finished");
-			
-			System.out.println("RESULT: " + response.get(ClientConstants.RESULT).toString());
-			
+
+			System.out.println("RESULT: "
+					+ response.get(ClientConstants.RESULT).toString());
+
 		} catch (UnknownHostException e1) {
 			e1.printStackTrace();
 		} catch (IOException e) {
