@@ -14,7 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.jboss.as.quickstarts.ejbTimer;
+package com.redhat.gss.sample.txRemovalTimer;
 
 import java.io.IOException;
 import java.net.InetAddress;
@@ -31,22 +31,29 @@ import org.jboss.as.controller.client.helpers.ClientConstants;
 import org.jboss.dmr.ModelNode;
 
 /**
- * Demonstrates how to use the EJB's @Schedule.
+ * Sample using the EJB's @Schedule and Native Management API for Transaction removal.
  * 
- * @author <a href="mailto:ozizka@redhat.com">Ondrej Zizka</a>
+ * Note that arbitrarily removing entries in the local transaction store can result in recoverable transactions being lost
+ * 
+ * @author <a href="mailto:jolee@redhat.com">Johnathon Lee</a>
  */
 @Singleton
-public class ScheduleExample {
+public class TxRemovalSample {
 
 	ModelControllerClient client = null;
 
+	// For time-saving purposes of the sample this is set to run every 5 seconds
 	@Schedule(second = "*/5", minute = "*", hour = "*", persistent = false)
-	public void txCleanup() throws IOException {
-
-		txProbe();
+	public void txCleanup(){
 
 		try {
+			
+			client = ModelControllerClient.Factory.create(
+					InetAddress.getByName("127.0.0.1"), 9999);
+			
+			txProbe();
 
+			//subsystem=transactions/log-store=log-store:read-resource(recursive=true)
 			ModelNode op = new ModelNode();
 			op.get("operation").set("read-children-resources");
 			op.get("child-type").set("transactions");
@@ -56,32 +63,31 @@ public class ScheduleExample {
 			addr.add("subsystem", "transactions");
 			addr.add("log-store", "log-store");
 			op.get("recursive").set(true);
-			System.out.println(op);
+			//show the operation
+			System.out.println("OPERATION: " + op);
 
-			// subsystem=transactions/log-store=log-store:read-resource(recursive=true)
+			
 
-			client = ModelControllerClient.Factory.create(
-					InetAddress.getByName("127.0.0.1"), 9999);
-
-			System.out.println("client.execute start");
 			ModelNode response = client.execute(new OperationBuilder(op)
 					.build());
-			System.out.println("client.execute finished");
-
+			
+			//show the result
 			System.out.println("RESULT: "
 					+ response.get(ClientConstants.RESULT).toString());
 
 			List<ModelNode> lst = response.get(ClientConstants.RESULT).asList();
 
-			Iterator it = lst.iterator();
+			Iterator<ModelNode> it = lst.iterator();
 
 			while (it.hasNext()) {
 
 				op = (ModelNode) it.next();
-				System.out.println("In Iterator: "
+				System.out.println("age-in-seconds: "
 						+ op.get(0).get("age-in-seconds"));
 
-				if (op.get(0).get("age-in-seconds").asInt() > 10000) {
+				// if it's older than an hour then delete it
+				if (op.get(0).get("age-in-seconds").asInt() > 3600) {
+					///subsystem=transactions/log-store=log-store/transactions=0\:ffff7f000001\:611e\:529f4dcc\:11:delete
 					ModelNode deleteOp = new ModelNode();
 					deleteOp.get("operation").set("delete");
 					deleteOp.get("operations").set(true);
@@ -91,7 +97,7 @@ public class ScheduleExample {
 					deleteAddr.add("log-store", "log-store");
 					deleteAddr.add("transactions", op.get(0).get("id"));
 					deleteOp.get("recursive").set(true);
-					System.out.println(deleteOp);
+					System.out.println("OPERATION:" + deleteOp);
 					response = client.execute(new OperationBuilder(deleteOp)
 							.build());
 				}
@@ -103,15 +109,17 @@ public class ScheduleExample {
 			e1.printStackTrace();
 		} catch (IOException e) {
 			e.printStackTrace();
-			client.close();
+			try {
+				client.close();
+			} catch (IOException e1) {
+				e1.printStackTrace();
+			}
 		}
 	}
 
 	// subsystem=transactions/log-store=log-store/:probe()
-	public void txProbe() {
+	public void txProbe() throws IOException {
 		System.out.println("txProbe");
-
-		try {
 
 			ModelNode op = new ModelNode();
 			op.get("operation").set("probe");
@@ -121,22 +129,12 @@ public class ScheduleExample {
 			addr.add("subsystem", "transactions");
 			addr.add("log-store", "log-store");
 
-			System.out.println("operation: " + op);
+			System.out.println("OPERATION: " + op);
 
-			client = ModelControllerClient.Factory.create(
-					InetAddress.getByName("127.0.0.1"), 9999);
-
-			System.out.println("client.execute start");
 			ModelNode response = client.execute(op);
-			System.out.println("client.execute finished");
-
+			
 			System.out.println("RESULT: "
 					+ response.get(ClientConstants.RESULT).toString());
 
-		} catch (UnknownHostException e1) {
-			e1.printStackTrace();
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
 	}
 }
