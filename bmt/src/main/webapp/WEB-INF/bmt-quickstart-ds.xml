@@ -21,18 +21,37 @@
    and should NOT be used in a production environment! -->  
 <datasources xmlns="http://www.jboss.org/ironjacamar/schema"
    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-   xsi:schemaLocation="http://www.jboss.org/ironjacamar/schema http://docs.jboss.org/ironjacamar/schema/datasources_1_0.xsd">
+   xsi:schemaLocation="http://www.jboss.org/ironjacamar/schema http://docs.jboss.org/ironjacamar/schema/datasources_1_2.xsd">
    <!-- The datasource is bound into JNDI at this location. We reference 
       this in META-INF/persistence.xml -->
-   <datasource jndi-name="java:jboss/datasources/BMTQuickstartDS"
-      pool-name="bmt-quickstart" enabled="true"
-      use-java-context="true">
-      <connection-url>jdbc:h2:mem:bmt-quickstart;DB_CLOSE_ON_EXIT=FALSE;DB_CLOSE_DELAY=-1</connection-url>
-      <driver>h2</driver>
-      <security>
-         <user-name>sa</user-name>
-         <password>sa</password>
-      </security>
-   </datasource>
+      <xa-datasource jndi-name="java:jboss/datasources/ignored" pool-name="ignored" enabled="false" statistics-enabled="true">
+        <xa-datasource-property name="ServerName">
+            leonardo.gsslab.rdu2.redhat.com
+        </xa-datasource-property>
+        <xa-datasource-property name="PortNumber">
+            50000
+        </xa-datasource-property>
+        <xa-datasource-property name="DatabaseName">
+            SAMPLE
+        </xa-datasource-property>
+        <xa-datasource-property name="DriverType">
+            4
+        </xa-datasource-property>
+        <xa-datasource-class>com.ibm.db2.jcc.DB2XADataSource</xa-datasource-class>
+        <driver>db2jcc4.jar</driver>
+        <xa-pool>
+            <min-pool-size>1</min-pool-size>
+            <prefill>true</prefill>
+        </xa-pool>
+        <security>
+            <user-name>jolee</user-name>
+            <password>jolee</password>
+        </security>
+        <validation>
+          <validate-on-match>false</validate-on-match>
+          <background-validation>false</background-validation>
+        </validation>
+    </xa-datasource>
+
 </datasources>
  
